@@ -5,7 +5,7 @@ import Ellipsis from "./Ellipsis";
 const Folder = ({ folder, fetchFolders, setSelectedFolder, onFolderClick }) => {
   // Generate dummy metadata if not provided
   const folderMetadata = folder.metadata || {
-    name: folder.name,
+    name: folder.folder_name,
     createdAt: folder.createdAt || "2025-01-15",
     modifiedAt: folder.modifiedAt || "2025-03-10",
     owner: "John Doe",
@@ -19,12 +19,44 @@ const Folder = ({ folder, fetchFolders, setSelectedFolder, onFolderClick }) => {
     // Check if the click is coming from the ellipsis container
     if (!e.target.closest(".ellipsis-container")) {
       if (onFolderClick) {
-        onFolderClick(folder);
+        onFolderClick(folder.folder_name);
       } else {
         setSelectedFolder(folder.id);
       }
     }
   };
+
+  const handleCreateFolder = async () => {
+    const newFolderName = prompt("Enter the name of the new folder:");
+    if (!newFolderName || !newFolderName.trim()) {
+      alert("Folder name cannot be empty.");
+      return;
+    }
+  
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.post(
+        "http://127.0.0.1:8000/folders/create",
+        { name: newFolderName.trim() },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+  
+      if (response.status === 201) {
+        alert("Folder created successfully!");
+        fetchFolders(); // Refresh the folder list
+      } else {
+        alert("Failed to create folder.");
+      }
+    } catch (error) {
+      console.error("Error creating folder:", error);
+      alert("Error creating folder. Please try again.");
+    }
+  };
+
 
   // <<<<<<< HEAD
   const handleSaveMetadata = (updatedMetadata) => {
@@ -45,20 +77,7 @@ const Folder = ({ folder, fetchFolders, setSelectedFolder, onFolderClick }) => {
   };
   // =======
   // Dummy metadata for folders and files
-  const dummyMetadata = {
-    folder: {
-      folderName: folder.name,
-      creationDate: "2023-10-01",
-      lastModified: "2023-10-05",
-      description: "none",
-    },
-    file: {
-      fileName: "example.txt",
-      creationDate: "2023-10-02",
-      lastModified: "2023-10-04",
-      description: "none",
-    },
-  };
+  
   <p
   onClick={(e) =>
     handleAction(() => {
@@ -88,7 +107,7 @@ const Folder = ({ folder, fetchFolders, setSelectedFolder, onFolderClick }) => {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `${folder.name}.pdf`); 
+      link.setAttribute("download", `${folder.folder_name}.pdf`); 
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -106,7 +125,7 @@ const Folder = ({ folder, fetchFolders, setSelectedFolder, onFolderClick }) => {
   
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`http://localhost:8000/docs#/default/delete_endpoint_documents_delete__document_id__delete${folderId}`, {
+      await axios.delete(`http://localhost:8000/folders/delete/${folder.folder_id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -121,31 +140,54 @@ const Folder = ({ folder, fetchFolders, setSelectedFolder, onFolderClick }) => {
   };
   
 
-  const handleRename = (folderId) => {
-    const newName = prompt("Enter new folder name:", folder.name);
-    if (newName && newName !== folder.name) {
-      console.log("Renaming folder:", folderId, "to", newName);
-      // Example API call:
-      // axios.put(`http://localhost:5000/api/folders/${folderId}`, { name: newName })
-      //   .then(() => {
-      //     fetchFolders();
-      //   })
-      //   .catch(error => {
-      //     console.error("Error renaming folder:", error);
-      //   });
-
-      // For now, just refresh folders
-      fetchFolders();
+  const handleRename = () => {
+    const newName = prompt("Enter new folder name:")?.trim();
+  
+    if (newName && newName !== folder.folder_name) {
+      console.log("Renaming folder:", folder.folder_name, "to", newName);
+  
+      // Create FormData and append the new_name field
+      const formData = new FormData();
+      formData.append('new_name', newName);
+  
+      axios.put(
+        `http://127.0.0.1:8000/folders/rename/${folder.folder_id}`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data', // Important for form data
+          },
+        }
+      )
+      .then(() => {
+        fetchFolders();
+      })
+      .catch(error => {
+        if (error.response) {
+          console.error("Error renaming folder:", error.response.data);
+        } else {
+          console.error("Error renaming folder:", error.message);
+        }
+      });
+    } else {
+      console.warn("Invalid folder name. Rename aborted.");
     }
   };
+  
+  
+
+
+
 
   return (
+    <div className="folder-container">
     <div className="folder" onClick={handleFolderClick}>
       <div className="folder-icon">📁</div>
-      <div className="folder-name">{folder.name}</div>
+      <div className="folder-name">{folder.folder_name}</div>
 
       <div className="folder-actions">
         <Ellipsis
+          foldername={folder.folder_name}
           folderId={folder.id}
           metadata={folderMetadata}
           onSaveMetadata={handleSaveMetadata}
@@ -154,7 +196,9 @@ const Folder = ({ folder, fetchFolders, setSelectedFolder, onFolderClick }) => {
           onRename={handleRename}
         />
       </div>
-
+      </div>
+      
+      
       <style>
         {`
           .folder {
