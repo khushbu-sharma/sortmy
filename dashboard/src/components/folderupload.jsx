@@ -1,59 +1,49 @@
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import axios from "axios";
 import "./UploadForm.css";
 
-const UploadForm = () => {
+const FolderUpload = () => {
   const [file, setFile] = useState(null);
-  const [title, setTitle] = useState("");
-  const [tags, setTags] = useState("");
-  const [permissions, setPermissions] = useState("");
-  const [folderName, setFolderName] = useState("");
   const [message, setMessage] = useState("");
   const [folderFiles, setFolderFiles] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [folderName, setFolderName] = useState("");
+  const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
   };
 
+  const handleFolderNameChange = (e) => {
+    setFolderName(e.target.value);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!file) {
-      alert("Please select a file to upload.");
+    if (!file || !folderName) {
+      alert("Please select a file and provide a folder name.");
       return;
     }
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("title", title);
-
-    const tagList = tags.split(",").map((tag) => tag.trim());
-    formData.append("tags", JSON.stringify(tagList));
-
-    const emailList = permissions.split(",").map((email) => email.trim());
-    formData.append("permissions", JSON.stringify(emailList));
-
-    formData.append("uploaded_by", "1");
-    formData.append("folder_name", folderName);
-
     const token = localStorage.getItem("auth_token");
 
     try {
-      const response = await fetch("http://localhost:8000/documents/upload", {
-        method: "POST",
-        body: formData,
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const response = await fetch(
+        `http://localhost:8000/folders/${folderName}/upload`,
+        {
+          method: "POST",
+          body: formData,
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
 
       if (response.ok) {
         setMessage("File uploaded successfully!");
         setFile(null);
-        setTitle("");
-        setTags("");
-        setPermissions("");
-        setFolderName("");
-        fetchFolderFiles(); // Refresh list after upload
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        fetchFolderFiles(); // Refresh file list
       } else {
         const errorData = await response.json();
         setMessage(`Upload failed: ${errorData.detail}`);
@@ -94,54 +84,30 @@ const UploadForm = () => {
   };
 
   useEffect(() => {
-    if (folderName) {
-      
-      fetchFolderFiles();
-      console.log("Folder name:", folderFiles);
-    }
+    if (folderName) fetchFolderFiles();
   }, [folderName]);
-
 
   return (
     <div className="upload-form-container">
       <div className="upload-form">
-        <h2>Upload Document</h2>
+        <h2>Upload Document to Folder: {folderName || "Enter Folder Name"}</h2>
         {message && <p className="upload-message">{message}</p>}
-
         <form onSubmit={handleSubmit}>
-          <label>Title:</label>
+          <label>Folder Name:</label>
           <input
             type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-          />
-
-          <label>Tags (comma-separated):</label>
-          <input
-            type="text"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-          />
-
-          <label>Permissions (comma-separated emails):</label>
-          <input
-            type="text"
-            value={permissions}
-            onChange={(e) => setPermissions(e.target.value)}
-            placeholder="example1@email.com, example2@email.com"
+            name="folder_name"
+            value={folderName}
+            onChange={handleFolderNameChange}
             required
           />
 
           <label>Choose File:</label>
-          <input type="file" onChange={handleFileChange} required />
-
-          <label>Folder Name:</label>
           <input
-            type="text"
-            value={folderName}
-            onChange={(e) => setFolderName(e.target.value)}
-            placeholder="Enter folder name"
+            type="file"
+            name="file"
+            onChange={handleFileChange}
+            ref={fileInputRef}
             required
           />
 
@@ -150,20 +116,16 @@ const UploadForm = () => {
           </button>
         </form>
 
-        {/* Folder File List */}
         <div className="folder-file-list">
           <h3>Files in "{folderName}"</h3>
           {loading ? (
             <p>Loading files...</p>
           ) : folderFiles.length > 0 ? (
             <ul>
-  {folderFiles.map((file, index) => (
-    <li key={index}>
-      {typeof file === "string" ? file : file.original_name}
-    </li>
-  ))}
-</ul>
-
+              {folderFiles.map((filename, index) => (
+                <li key={index}>{filename}</li>
+              ))}
+            </ul>
           ) : (
             <p>No files found in this folder.</p>
           )}
@@ -173,4 +135,4 @@ const UploadForm = () => {
   );
 };
 
-export default UploadForm;
+export default FolderUpload;

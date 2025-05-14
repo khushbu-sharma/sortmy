@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
+
 import filesFoldersData from "../../../folderFilesData"; // Import mock data
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
@@ -8,12 +9,42 @@ import axios from "axios";
 
 const FolderDetails = () => {
   const { folderName } = useParams();
-  const [folderData, setFolderData] = useState(null);
+  const navigate = useNavigate();
 
+  const [folderData, setFolderData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const fetchFolderFiles = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("auth_token");
+
+      const response = await axios.get(
+        "http://localhost:8000/folders/all-documents",
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
+
+      const folder = response.data.find((f) => f.folder_name === folderName);
+
+      if (!folder) {
+        console.warn(`Folder "${folderName}" not found.`);
+        setFolderData([]);
+        return;
+      }
+      console.log("Folder data:", folder.files);
+      setFolderData(folder.files || []);
+      console.log("Folder data:", folderData);
+    } catch (error) {
+
+      console.error("Failed to fetch folder contents:", error);
+      setFolderData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => {
-    const folder = filesFoldersData.find((f) => f.name === folderName);
-    console.log("folder:", folder);
-    setFolderData(folder);
+   fetchFolderFiles();
   }, [folderName]);
 
   const handleDelete = (fileId) => {
@@ -134,19 +165,19 @@ const FolderDetails = () => {
               </button>
 
               <button
-                onClick={triggerFileInput}
-                style={{
-                  backgroundColor: "#3A506B",
-                  color: "white",
-                  padding: "10px 15px",
-                  borderRadius: "5px",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "16px",
-                }}
-              >
-                📤 Upload
-              </button>
+  onClick={() => navigate("/folder-upload")}
+  style={{
+    backgroundColor: "#3A506B",
+    color: "white",
+    padding: "10px 15px",
+    borderRadius: "5px",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "16px",
+  }}
+>
+  📤 Upload
+</button>
 
               <input
                 type="file"
@@ -160,7 +191,7 @@ const FolderDetails = () => {
           {/* 🔹 File List */}
           {folderData ? (
             <ul>
-              {folderData.files.map((file) => (
+              {folderData.map((file) => (
                 <li
                   key={file.id}
                   style={{
@@ -171,7 +202,7 @@ const FolderDetails = () => {
                   }}
                 >
                   <span>
-                    📄 {file.name} ({file.size})
+                    📄 {file} 
                   </span>
                   <Ellipsis
                     fileId={file.id}
